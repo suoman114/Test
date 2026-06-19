@@ -44,6 +44,7 @@ Bitbucket Server(Data Center)를 패키지 저장소로 사용하는 팀을 위�
 - [x] 4. tar 업로드 → Bitbucket 커밋 (신규 버전 등록)
 - [x] 5. 버전 비교 (tar 내부 파일 트리 diff, 커밋 메타)
 - [x] 6. 감사 로그 (누가 언제 무엇을 받아갔나/올렸나)
+- [x] 7. Docker 화 (git 포함 backend 이미지 + frontend + nginx 프록시 + compose)
 
 ## 오케스트레이션 개발 메모
 
@@ -83,6 +84,25 @@ backend/    FastAPI 앱
   .env.example
 frontend/   Next.js 대시보드
 ```
+
+## 배포 (Docker)
+
+```
+proxy(nginx :8080)
+  ├─ /, 정적     → frontend(Next.js :3000, standalone)
+  └─ /api,/docs  → backend(FastAPI :8000, +git)
+volumes: audit-data → backend:/app/data (감사 SQLite 영속화)
+```
+
+- `docker-compose.yml`, `backend/Dockerfile`(git 포함), `frontend/Dockerfile`(multi-stage standalone), `deploy/nginx.conf`.
+- **server/browser API 주소 분기**: 목록·상세는 서버 컴포넌트라 컨테이너 내부 `INTERNAL_API_BASE=http://backend:8000` 사용,
+  브라우저 client 컴포넌트는 프록시 상대경로(`NEXT_PUBLIC_API_BASE=""`). `frontend/lib/api.ts` 가 `typeof window` 로 분기.
+- 업로드용 git 바이너리는 backend 이미지에 포함됨.
+- 실행: `cp backend/.env.example backend/.env` 후 `docker compose up -d --build`.
+
+> ⚠️ 이미지 빌드는 이 클라우드 세션에서 검증하지 못함 — Docker Hub unauthenticated pull rate-limit(429) +
+> 미러(ECR) egress 차단 때문. 구성은 `docker compose config` 로만 검증. **빌드는 사내/빌드 가능한 환경에서 수행**할 것.
+> npm/pip 레지스트리 접근만 되면 표준 빌드로 동작하도록 작성됨.
 
 ## 테스트 / 연동 검증
 

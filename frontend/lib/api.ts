@@ -1,5 +1,12 @@
+// 서버 컴포넌트(Node 런타임)에서는 컨테이너 내부 주소(INTERNAL_API_BASE)를,
+// 브라우저에서는 공개 주소(NEXT_PUBLIC_API_BASE, 리버스 프록시 사용 시 빈 문자열=상대경로)를 쓴다.
+// 둘 다 없으면 로컬 개발 기본값(localhost:8000).
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+  typeof window === "undefined"
+    ? process.env.INTERNAL_API_BASE ??
+      process.env.NEXT_PUBLIC_API_BASE ??
+      "http://localhost:8000"
+    : process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 export interface Site {
   slug: string;

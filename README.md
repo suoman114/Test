@@ -35,6 +35,24 @@ npm run dev
 
 대시보드: http://localhost:3000
 
+## Docker 로 배포
+
+nginx 단일 진입점(`:8080`) 뒤에 백엔드/프론트엔드를 둔다. 브라우저는 같은 오리진으로
+`/api` 를 호출하므로 호스트별 설정·CORS 가 필요 없다.
+
+```bash
+cp backend/.env.example backend/.env   # BITBUCKET_* 채우기 (필수)
+docker compose up -d --build
+# 접속: http://<호스트>:8080
+```
+
+- `proxy`(nginx): `/`, `/api`, `/docs` 라우팅, tar 업로드 위해 `client_max_body_size 1024m`
+- `backend`: FastAPI + git(업로드 push 용), 감사 DB 는 `audit-data` 볼륨에 영속화
+- `frontend`: Next.js standalone 빌드
+
+> 참고: 서버 컴포넌트(목록 페이지)는 컨테이너 내부에서 `INTERNAL_API_BASE=http://backend:8000`
+> 로, 브라우저는 프록시 상대경로로 백엔드를 호출한다 (`lib/api.ts` 가 분기).
+
 ## 주요 환경변수 (backend/.env)
 
 | 변수 | 설명 |
