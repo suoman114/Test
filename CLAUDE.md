@@ -19,7 +19,7 @@ Bitbucket Server(Data Center)를 패키지 저장소로 사용하는 팀을 위�
 | 사이트 → repo 매핑 | Bitbucket **project key** 단위로 repo 목록을 끌어옴 | `BITBUCKET_PROJECT_KEY` |
 | 버전 관리 방식 | **git tag 기반** + tar 파일명 고정 | 파일명에 버전을 박지 않고 tag로 버전을 식별 → 비교/이력이 쉬움 |
 | tar 경로 | repo 루트의 고정 경로 | `PACKAGE_TAR_PATH` (기본 `package.tar`) |
-| 인증 | 서비스 계정 **Personal Access Token** 1개 | `BITBUCKET_TOKEN`. 추후 사용자별 PAT로 확장 가능 |
+| 인증 | **PAT(Bearer)** 또는 **아이디/비번(Basic)** | `BITBUCKET_TOKEN` 또는 `BITBUCKET_USERNAME`+`BITBUCKET_PASSWORD`. username/password 있으면 Basic 우선. 구버전 Bitbucket(PAT 메뉴 없음) 대응 |
 | 대용량 tar | Git LFS 권장 (50MB+) | repo 설정에서 LFS 트래킹 |
 
 ## 아키텍처

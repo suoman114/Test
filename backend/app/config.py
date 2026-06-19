@@ -8,7 +8,18 @@ class Settings(BaseSettings):
 
     bitbucket_base_url: str = "https://bitbucket.example.com"
     bitbucket_project_key: str = "PKG"
+
+    # 인증: 둘 중 하나를 쓴다.
+    #  - 최신 Bitbucket(5.5+): Personal Access Token → bitbucket_token (Bearer)
+    #  - 구버전(PAT 메뉴 없음): 아이디/비밀번호 → bitbucket_username + bitbucket_password (Basic)
+    # username/password 가 모두 채워져 있으면 Basic 을, 아니면 token(Bearer)을 쓴다.
     bitbucket_token: str = "changeme"
+    bitbucket_username: str = ""
+    bitbucket_password: str = ""
+
+    @property
+    def use_basic_auth(self) -> bool:
+        return bool(self.bitbucket_username and self.bitbucket_password)
 
     # repo 루트 기준 tar 경로. 버전은 git tag 로 식별한다.
     package_tar_path: str = "package.tar"

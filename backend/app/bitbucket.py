@@ -30,9 +30,21 @@ class BitbucketClient:
         self._settings = settings
         self._base = settings.bitbucket_base_url.rstrip("/")
         self._project = settings.bitbucket_project_key
+
+        # 구버전 Bitbucket(PAT 없음)은 아이디/비번(Basic), 최신은 토큰(Bearer).
+        auth: httpx.Auth | None = None
+        headers: dict[str, str] = {}
+        if settings.use_basic_auth:
+            auth = httpx.BasicAuth(
+                settings.bitbucket_username, settings.bitbucket_password
+            )
+        else:
+            headers["Authorization"] = f"Bearer {settings.bitbucket_token}"
+
         self._client = httpx.AsyncClient(
             base_url=self._base,
-            headers={"Authorization": f"Bearer {settings.bitbucket_token}"},
+            headers=headers,
+            auth=auth,
             timeout=30.0,
             transport=transport,
         )
