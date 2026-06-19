@@ -34,6 +34,94 @@ export const fetchVersions = (slug: string) =>
 export const downloadUrl = (slug: string, version: string) =>
   `${API_BASE}/api/sites/${slug}/versions/${version}/download`;
 
+// --- 업로드 (신규 버전 발행) ------------------------------------------------
+
+export async function uploadVersion(
+  slug: string,
+  data: {
+    file: File;
+    version: string;
+    message?: string;
+    author_name?: string;
+    author_email?: string;
+  },
+): Promise<Version> {
+  const form = new FormData();
+  form.append("file", data.file);
+  form.append("version", data.version);
+  if (data.message) form.append("message", data.message);
+  if (data.author_name) form.append("author_name", data.author_name);
+  if (data.author_email) form.append("author_email", data.author_email);
+  const res = await fetch(`${API_BASE}/api/sites/${slug}/versions`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      const b = await res.json();
+      if (b?.detail) detail = b.detail;
+    } catch {}
+    throw new Error(`업로드 실패: ${detail}`);
+  }
+  return res.json() as Promise<Version>;
+}
+
+// --- 버전 비교 --------------------------------------------------------------
+
+export interface MemberDiff {
+  name: string;
+  from_size?: number | null;
+  to_size?: number | null;
+}
+
+export interface CompareCommit {
+  id: string;
+  message?: string | null;
+  author?: string | null;
+  date?: string | null;
+}
+
+export interface CompareResult {
+  from_version: string;
+  to_version: string;
+  added: MemberDiff[];
+  removed: MemberDiff[];
+  changed: MemberDiff[];
+  commits: CompareCommit[];
+  note?: string | null;
+}
+
+export const fetchCompare = (
+  slug: string,
+  fromVersion: string,
+  toVersion: string,
+) =>
+  get<CompareResult>(
+    `/api/sites/${slug}/compare?from_version=${encodeURIComponent(
+      fromVersion,
+    )}&to_version=${encodeURIComponent(toVersion)}`,
+  );
+
+// --- 감사 로그 --------------------------------------------------------------
+
+export interface AuditEvent {
+  id: number;
+  action: string; // 'download' | 'upload'
+  slug: string;
+  version: string;
+  user?: string | null;
+  detail?: string | null;
+  created_at?: string | null;
+}
+
+export const fetchAuditEvents = (limit = 200, slug?: string) => {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (slug) qs.set("slug", slug);
+  return get<AuditEvent[]>(`/api/audit?${qs.toString()}`);
+};
+
 export function formatBytes(bytes?: number | null): string {
   if (bytes == null) return "—";
   const units = ["B", "KB", "MB", "GB"];

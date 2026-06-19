@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 backend/.env
+backend/data/
 
 # Node / Next.js
 node_modules/

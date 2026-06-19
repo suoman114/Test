@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import sites, versions
+from .routers import audit, compare, sites, uploads, versions
 
 settings = get_settings()
 
@@ -22,6 +22,9 @@ app.add_middleware(
 
 app.include_router(sites.router)
 app.include_router(versions.router)
+app.include_router(uploads.router)
+app.include_router(compare.router)
+app.include_router(audit.router)
 
 
 @app.get("/health", tags=["meta"])

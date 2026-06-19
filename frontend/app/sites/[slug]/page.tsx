@@ -25,7 +25,23 @@ export default async function SitePage({
       <Link href="/" className="text-sm text-slate-500 hover:underline">
         ← 사이트 목록
       </Link>
-      <h1 className="mt-2 text-2xl font-bold">{slug}</h1>
+      <div className="mt-2 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">{slug}</h1>
+        <div className="flex gap-2">
+          <Link
+            href={`/sites/${slug}/compare`}
+            className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+          >
+            버전 비교
+          </Link>
+          <Link
+            href={`/sites/${slug}/upload`}
+            className="rounded bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+          >
+            tar 업로드
+          </Link>
+        </div>
+      </div>
       <p className="mb-6 text-sm text-slate-400">버전 이력 (git tag)</p>
 
       {error && (

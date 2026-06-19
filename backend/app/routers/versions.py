@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from .. import db
 from ..bitbucket import BitbucketClient, _ts
 from ..config import Settings, get_settings
 from ..deps import get_bitbucket
@@ -46,6 +47,7 @@ async def download_version(
     """특정 버전(tag)의 tar 를 스트리밍 다운로드."""
     path = settings.package_tar_path
     filename = f"{slug}-{version}.tar"
+    db.record("download", slug, version, detail=filename)
 
     async def streamer():
         async with await bb.raw_stream(slug, path, at=version) as resp:

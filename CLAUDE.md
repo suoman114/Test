@@ -41,9 +41,31 @@ Bitbucket Server(Data Center)를 패키지 저장소로 사용하는 팀을 위�
 - [x] 1. 모노레포 스캐폴드 (`backend/` + `frontend/`)
 - [x] 2. Bitbucket Server 연동: repo/태그/커밋/파일 조회 API
 - [x] 3. 프론트엔드 사이트 목록 + 상세(버전 이력)
-- [ ] 4. tar 업로드 → Bitbucket 커밋 (신규 버전 등록)
-- [ ] 5. 버전 비교 (tar 내부 파일 트리 diff, 커밋 메타)
-- [ ] 6. 감사 로그 (누가 언제 무엇을 받아갔나/올렸나)
+- [x] 4. tar 업로드 → Bitbucket 커밋 (신규 버전 등록)
+- [x] 5. 버전 비교 (tar 내부 파일 트리 diff, 커밋 메타)
+- [x] 6. 감사 로그 (누가 언제 무엇을 받아갔나/올렸나)
+
+## 오케스트레이션 개발 메모
+
+기능 4·5·6 은 **병렬 서브에이전트**로 동시 개발했다. 충돌을 막기 위해:
+- 각 에이전트는 **새 파일만** 생성, 공유 파일(`main.py`, `requirements.txt`,
+  `lib/api.ts`, 기존 페이지)은 손대지 않음.
+- 오케스트레이터가 마지막에 라우터 등록 / api 함수 / 링크 / 감사 record 호출을 일괄 배선.
+- 신규 백엔드 의존성 0 (git=subprocess, tar=tarfile, audit=sqlite3 — 전부 표준 라이브러리).
+
+### 추가된 모듈
+
+| 파일 | 역할 |
+|------|------|
+| `backend/app/gitops.py` | tar 를 받아 clone→commit→tag→push (subprocess git, Bearer 토큰) |
+| `backend/app/routers/uploads.py` | `POST /api/sites/{slug}/versions` (multipart 업로드) |
+| `backend/app/tarinspect.py` | tar 멤버 목록·크기 비교 (added/removed/changed) |
+| `backend/app/routers/compare.py` | `GET /api/sites/{slug}/compare` (파일 diff + 커밋 범위) |
+| `backend/app/db.py` | SQLite 감사 로그 (`record`, `list_events`), `backend/data/audit.db` |
+| `backend/app/routers/audit.py` | `GET /api/audit` |
+
+> 주의: 감사 DB는 `backend/data/` 에 생성되며 `.gitignore` 처리됨.
+> upload 의 git push 는 런타임에 `git` 바이너리가 필요(Docker 이미지에 포함할 것).
 
 ## 디렉토리
 
