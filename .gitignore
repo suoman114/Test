@@ -6,6 +6,8 @@ venv/
 backend/.env
 backend/data/
 
+.pytest_cache/
+
 # Node / Next.js
 node_modules/
 frontend/.next/

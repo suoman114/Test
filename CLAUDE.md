@@ -84,6 +84,43 @@ backend/    FastAPI 앱
 frontend/   Next.js 대시보드
 ```
 
+## 테스트 / 연동 검증
+
+end-to-end 통합 테스트는 **가짜 Bitbucket Server**(REST 1.0 응답을 흉내내는 ASGI 앱)를
+띄우고, 클라이언트 transport 를 거기로 갈아끼워 in-process 로 전 구간을 검증한다.
+실제 토큰/네트워크 없이 돌아간다.
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest                 # tests/test_integration.py
+```
+
+- 주입 지점: `app/deps.py` 의 `build_client()` + `_test_transport` 전역, `BitbucketClient(transport=...)`.
+- 가짜 서버/픽스처: `tests/fake_bitbucket.py`, `tests/conftest.py`.
+
+**사내망에서 실제 Bitbucket 으로 확인**할 때는 (이 클라우드 세션은 사내망에 못 닿을 수 있음):
+
+```bash
+cd backend && cp .env.example .env   # BITBUCKET_* 채우기
+python scripts/live_smoke.py            # 읽기 전용: 사이트/태그/커밋/크기
+python scripts/live_smoke.py --download  # 최신 tar 다운로드까지
+```
+
+### 통합 테스트로 잡은 실버그 (수정 완료)
+
+1. **다운로드 스트리밍 클라이언트 조기 종료** — `StreamingResponse` 본문은 핸들러 반환 *뒤* 에
+   흘러나가는데 요청-스코프 의존성이 그 전에 httpx 클라이언트를 닫아 `Cannot send a request,
+   as the client has been closed` 발생. → 다운로드는 전용 클라이언트를 만들어 스트리머가
+   끝까지 들고 있다가 직접 닫도록 변경 (`build_client` + streamer `finally`).
+2. **버전 비교 from-태그 미해석** — `compare.py` 가 태그 이름(`from_version`)을 커밋
+   해시(`id`/`displayId`)와 직접 비교 → 절대 매칭 안 돼 항상 fallback. → from 태그를
+   `list_tags` 로 커밋 해시로 먼저 해석한 뒤 비교하도록 수정.
+
+> 미검증/주의: `bitbucket.file_size()` 의 `browse?size=true` 방식은 가짜 서버 기준이며,
+> 실제 Bitbucket 응답 형태는 라이브 스모크로 한 번 확인 필요(크기가 안 잡히면 None 으로
+> graceful 하게 빠지므로 치명적이진 않음).
+
 ## 개발 메모
 
 - 작업 브랜치: `claude/trusting-carson-c2ukc7`

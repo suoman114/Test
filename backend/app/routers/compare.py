@@ -58,7 +58,15 @@ async def compare_versions(
     b = await list_members(bb, slug, to_version, settings)
     added, removed, changed = diff_members(a, b)
 
-    # 커밋 목록: to 에서 도달 가능한 최근 커밋을 가져온 뒤, from 이 보이면
+    # from 태그를 커밋 해시로 먼저 해석한다. (태그 이름은 커밋 id 와 다르므로
+    # 이름끼리 비교하면 절대 못 찾는다 → 태그→커밋 해석이 필요)
+    from_commit_id: str | None = None
+    for tag in await bb.list_tags(slug):
+        if tag.get("displayId") == from_version:
+            from_commit_id = tag.get("latestCommit")
+            break
+
+    # 커밋 목록: to 에서 도달 가능한 최근 커밋을 가져온 뒤, from 커밋이 보이면
     # 거기서 잘라 "from 이후 ~ to" 범위만 남긴다 (until=to).
     raw_commits = await bb.list_commits(slug, until=to_version, limit=100)
     commits: list[CompareCommit] = []
@@ -67,9 +75,8 @@ async def compare_versions(
 
     for c in raw_commits:
         cid = c.get("id", "")
-        disp = c.get("displayId", "")
-        # from 태그에 해당하는 커밋을 만나면 그 이전 이력은 from 에 이미 포함됨
-        if from_version in (cid, disp) or (cid and cid.startswith(from_version)):
+        # from 커밋을 만나면 그 이전 이력은 from 에 이미 포함됨
+        if from_commit_id and cid == from_commit_id:
             reached_from = True
             break
         commits.append(
@@ -82,10 +89,16 @@ async def compare_versions(
         )
 
     if not reached_from:
-        note = (
-            f"'{from_version}' 커밋을 최근 {len(raw_commits)}개 이력에서 찾지 못해, "
-            f"'{to_version}' 기준 최근 커밋만 표시합니다."
-        )
+        if from_commit_id is None:
+            note = (
+                f"태그 '{from_version}' 를 찾지 못해 '{to_version}' 기준 "
+                f"최근 커밋만 표시합니다."
+            )
+        else:
+            note = (
+                f"'{from_version}' 커밋을 최근 {len(raw_commits)}개 이력에서 찾지 못해, "
+                f"'{to_version}' 기준 최근 커밋만 표시합니다."
+            )
 
     return CompareResult(
         from_version=from_version,

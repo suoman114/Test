@@ -20,7 +20,13 @@ def _ts(ms: int | None) -> datetime | None:
 
 
 class BitbucketClient:
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        settings: Settings,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ):
+        # transport 는 테스트에서 가짜 Bitbucket(ASGI) 로 갈아끼우기 위한 주입구.
+        # 운영에서는 None → 실제 네트워크.
         self._settings = settings
         self._base = settings.bitbucket_base_url.rstrip("/")
         self._project = settings.bitbucket_project_key
@@ -28,6 +34,7 @@ class BitbucketClient:
             base_url=self._base,
             headers={"Authorization": f"Bearer {settings.bitbucket_token}"},
             timeout=30.0,
+            transport=transport,
         )
 
     async def aclose(self) -> None:
