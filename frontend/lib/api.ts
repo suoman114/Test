@@ -12,18 +12,36 @@ export interface Site {
   slug: string;
   name: string;
   description?: string | null;
-  latest_version?: string | null;
-  updated_at?: string | null;
-  size_bytes?: number | null;
 }
 
-export interface Version {
+// repo 안의 패키지 파일 하나
+export interface Package {
   name: string;
+  path: string;
+  size_bytes?: number | null;
+  updated_at?: string | null;
+  last_author?: string | null;
+  last_commit_id?: string | null;
+  last_message?: string | null;
+}
+
+// 패키지 파일의 한 버전 = 그 파일을 바꾼 커밋
+export interface PackageVersion {
   commit_id: string;
+  display_id?: string | null;
   message?: string | null;
   author?: string | null;
   created_at?: string | null;
-  size_bytes?: number | null;
+}
+
+export interface AuditEvent {
+  id: number;
+  action: string;
+  slug: string;
+  version: string;
+  user?: string | null;
+  detail?: string | null;
+  created_at?: string | null;
 }
 
 async function get<T>(path: string): Promise<T> {
@@ -35,92 +53,21 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const fetchSites = () => get<Site[]>("/api/sites");
-export const fetchVersions = (slug: string) =>
-  get<Version[]>(`/api/sites/${slug}/versions`);
 
-export const downloadUrl = (slug: string, version: string) =>
-  `${API_BASE}/api/sites/${slug}/versions/${version}/download`;
+export const fetchPackages = (slug: string) =>
+  get<Package[]>(`/api/sites/${slug}/packages`);
 
-// --- 업로드 (신규 버전 발행) ------------------------------------------------
-
-export async function uploadVersion(
-  slug: string,
-  data: {
-    file: File;
-    version: string;
-    message?: string;
-    author_name?: string;
-    author_email?: string;
-  },
-): Promise<Version> {
-  const form = new FormData();
-  form.append("file", data.file);
-  form.append("version", data.version);
-  if (data.message) form.append("message", data.message);
-  if (data.author_name) form.append("author_name", data.author_name);
-  if (data.author_email) form.append("author_email", data.author_email);
-  const res = await fetch(`${API_BASE}/api/sites/${slug}/versions`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) {
-    let detail = `${res.status}`;
-    try {
-      const b = await res.json();
-      if (b?.detail) detail = b.detail;
-    } catch {}
-    throw new Error(`업로드 실패: ${detail}`);
-  }
-  return res.json() as Promise<Version>;
-}
-
-// --- 버전 비교 --------------------------------------------------------------
-
-export interface MemberDiff {
-  name: string;
-  from_size?: number | null;
-  to_size?: number | null;
-}
-
-export interface CompareCommit {
-  id: string;
-  message?: string | null;
-  author?: string | null;
-  date?: string | null;
-}
-
-export interface CompareResult {
-  from_version: string;
-  to_version: string;
-  added: MemberDiff[];
-  removed: MemberDiff[];
-  changed: MemberDiff[];
-  commits: CompareCommit[];
-  note?: string | null;
-}
-
-export const fetchCompare = (
-  slug: string,
-  fromVersion: string,
-  toVersion: string,
-) =>
-  get<CompareResult>(
-    `/api/sites/${slug}/compare?from_version=${encodeURIComponent(
-      fromVersion,
-    )}&to_version=${encodeURIComponent(toVersion)}`,
+export const fetchPackageVersions = (slug: string, path: string) =>
+  get<PackageVersion[]>(
+    `/api/sites/${slug}/packages/versions?path=${encodeURIComponent(path)}`,
   );
 
-// --- 감사 로그 --------------------------------------------------------------
-
-export interface AuditEvent {
-  id: number;
-  action: string; // 'download' | 'upload'
-  slug: string;
-  version: string;
-  user?: string | null;
-  detail?: string | null;
-  created_at?: string | null;
-}
+// 패키지 다운로드 URL. at(커밋 id) 주면 특정 버전.
+export const packageDownloadUrl = (slug: string, path: string, at?: string) => {
+  const qs = new URLSearchParams({ path });
+  if (at) qs.set("at", at);
+  return `${API_BASE}/api/sites/${slug}/packages/download?${qs.toString()}`;
+};
 
 export const fetchAuditEvents = (limit = 200, slug?: string) => {
   const qs = new URLSearchParams();

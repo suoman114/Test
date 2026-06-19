@@ -21,7 +21,18 @@ class Settings(BaseSettings):
     def use_basic_auth(self) -> bool:
         return bool(self.bitbucket_username and self.bitbucket_password)
 
-    # repo 루트 기준 tar 경로. 버전은 git tag 로 식별한다.
+    @property
+    def package_extension_list(self) -> list[str]:
+        return [
+            e.strip().lower()
+            for e in self.package_extensions.split(",")
+            if e.strip()
+        ]
+
+    # 패키지로 인식할 파일 확장자 (쉼표 구분). repo 안을 recursive 스캔해서 매칭.
+    package_extensions: str = ".tar,.tar.gz,.tgz"
+
+    # (구) 단일 tar 경로 — 더 이상 목록 스캔에 쓰지 않으나 호환을 위해 남김.
     package_tar_path: str = "package.tar"
 
     # 노출할 repo slug 정규식 필터 (빈 문자열이면 전체)

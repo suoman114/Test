@@ -16,9 +16,10 @@ Bitbucket Server(Data Center)를 패키지 저장소로 사용하는 팀을 위�
 | 항목 | 결정 | 비고 |
 |------|------|------|
 | 호스팅 | 사내 서버 + Docker | tar이 크고 업로드 시 서버가 git push 프록시 역할을 해야 해서 |
-| 사이트 → repo 매핑 | Bitbucket **project key** 단위로 repo 목록을 끌어옴 | `BITBUCKET_PROJECT_KEY` |
-| 버전 관리 방식 | **git tag 기반** + tar 파일명 고정 | 파일명에 버전을 박지 않고 tag로 버전을 식별 → 비교/이력이 쉬움 |
-| tar 경로 | repo 루트의 고정 경로 | `PACKAGE_TAR_PATH` (기본 `package.tar`) |
+| 사이트 → repo 매핑 | Bitbucket **project key** 단위로 repo 목록 (개인 repo면 `~userID`) | `BITBUCKET_PROJECT_KEY` |
+| 패키지 모델 | **repo 1개 = tar 여러 개** (recursive 스캔) | 실데이터 반영 (아래 "모델 변경" 참고) |
+| 버전 관리 방식 | **파일별 커밋 이력** (덮어쓰기) | 태그 아님 — 같은 tar 를 덮어쓴 커밋들이 곧 버전 |
+| 패키지 인식 | 확장자 매칭 | `PACKAGE_EXTENSIONS` (기본 `.tar,.tar.gz,.tgz`) |
 | 인증 | **PAT(Bearer)** 또는 **아이디/비번(Basic)** | `BITBUCKET_TOKEN` 또는 `BITBUCKET_USERNAME`+`BITBUCKET_PASSWORD`. username/password 있으면 Basic 우선. 구버전 Bitbucket(PAT 메뉴 없음) 대응 |
 | 대용량 tar | Git LFS 권장 (50MB+) | repo 설정에서 LFS 트래킹 |
 
@@ -103,6 +104,26 @@ volumes: audit-data → backend:/app/data (감사 SQLite 영속화)
 > ⚠️ 이미지 빌드는 이 클라우드 세션에서 검증하지 못함 — Docker Hub unauthenticated pull rate-limit(429) +
 > 미러(ECR) egress 차단 때문. 구성은 `docker compose config` 로만 검증. **빌드는 사내/빌드 가능한 환경에서 수행**할 것.
 > npm/pip 레지스트리 접근만 되면 표준 빌드로 동작하도록 작성됨.
+
+## 모델 변경 (실데이터 반영, 중요)
+
+사내 실제 Bitbucket(v4.12, 개인 repo `~kigap`)에 붙여보니 초기 가정과 달랐다:
+
+| 초기 가정 | 실제 |
+|-----------|------|
+| repo 1개 = 패키지 1개 (`package.tar`) | repo 1개 안에 tar.gz **여러 개** (루트 + 하위 폴더) |
+| 버전 = git tag | 대부분 태그 없음. **같은 파일 덮어쓰기** → 커밋 이력이 버전 |
+| 토큰(PAT) 인증 | v4.12 라 PAT 없음 → **아이디/비번(Basic)** |
+
+→ 조회 로직을 **패키지(파일) 단위**로 재설계:
+- `GET /api/sites` — repo 목록 (가벼움)
+- `GET /api/sites/{slug}/packages` — repo recursive 스캔, 확장자 매칭 파일 = 패키지
+- `GET /api/sites/{slug}/packages/versions?path=` — 그 파일의 커밋 이력 = 버전
+- `GET /api/sites/{slug}/packages/download?path=&at=` — 다운로드 (at=커밋이면 그 버전)
+- 핵심 모듈: `app/packages.py`(스캔/이력), `app/routers/packages.py`.
+
+> 구(舊) 태그 기반 라우터(`versions`/`compare`/`uploads`)와 프론트 페이지(upload/compare)는
+> 아직 남아있으나 새 UI 와 분리됨 — **업로드/비교는 새 모델로 재작성 필요(TODO)**.
 
 ## 테스트 / 연동 검증
 

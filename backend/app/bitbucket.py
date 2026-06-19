@@ -54,17 +54,19 @@ class BitbucketClient:
 
     # --- 내부 헬퍼 ---------------------------------------------------------
 
-    async def _get(self, path: str, **params: Any) -> dict[str, Any]:
-        resp = await self._client.get(path, params=params)
+    async def _get(self, endpoint: str, **params: Any) -> dict[str, Any]:
+        # endpoint 로 이름을 둔 이유: Bitbucket 쿼리 파라미터 중 'path' 가 있어서
+        # 첫 인자 이름이 path 면 **params 의 path 와 충돌한다.
+        resp = await self._client.get(endpoint, params=params)
         resp.raise_for_status()
         return resp.json()
 
-    async def _paged(self, path: str, **params: Any) -> list[dict[str, Any]]:
+    async def _paged(self, endpoint: str, **params: Any) -> list[dict[str, Any]]:
         """Bitbucket 페이지네이션을 전부 순회해 values 를 모은다."""
         out: list[dict[str, Any]] = []
         start = 0
         while True:
-            page = await self._get(path, start=start, limit=100, **params)
+            page = await self._get(endpoint, start=start, limit=100, **params)
             out.extend(page.get("values", []))
             if page.get("isLastPage", True):
                 break
@@ -98,6 +100,37 @@ class BitbucketClient:
 
     async def get_commit(self, slug: str, commit_id: str) -> dict[str, Any]:
         return await self._get(f"{self._repo_base(slug)}/commits/{commit_id}")
+
+    async def commits_for_path(
+        self, slug: str, path: str, until: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """특정 파일 경로를 바꾼 커밋 이력 (= 그 패키지의 버전들)."""
+        params: dict[str, Any] = {"path": path, "limit": limit}
+        if until:
+            params["until"] = until
+        page = await self._get(f"{self._repo_base(slug)}/commits", **params)
+        return page.get("values", [])
+
+    # --- 디렉토리 / 파일 ---------------------------------------------------
+
+    async def list_directory(
+        self, slug: str, path: str = "", at: str | None = None
+    ) -> list[dict[str, Any]]:
+        """한 디렉토리의 바로 아래 자식들(파일/폴더)을 반환. 자식 페이지네이션 처리."""
+        url = f"{self._repo_base(slug)}/browse/{path}" if path else f"{self._repo_base(slug)}/browse"
+        out: list[dict[str, Any]] = []
+        start = 0
+        while True:
+            params: dict[str, Any] = {"start": start, "limit": 1000}
+            if at:
+                params["at"] = at
+            data = await self._get(url, **params)
+            children = data.get("children", {})
+            out.extend(children.get("values", []))
+            if children.get("isLastPage", True):
+                break
+            start = children.get("nextPageStart", start + 1000)
+        return out
 
     # --- 파일 (tar) --------------------------------------------------------
 
